@@ -1,4 +1,5 @@
-import React, {useState, useEffect, useRef} from 'react';
+/* eslint-disable react-native/no-inline-styles */
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {
   View,
   Text,
@@ -98,7 +99,6 @@ import {
 const StatusScreen = ({navigation, navigator}) => {
   const [selectedReportType, setSelectedReportType] = useState('Building');
   const [location, setLocation] = useState(null);
-  const [userId, setUserId] = useState(null);
   const [role, setRole] = useState(null);
   const [userName, setUserName] = useState(null);
   const [statusreportbuildingData, setBuildingData] = useState([]);
@@ -174,7 +174,7 @@ const StatusScreen = ({navigation, navigator}) => {
     '2515': EEUpdPanel2515Api,
     Deposit: EEUpdPanelDepositeFundApi,
     DPDC: EEUpdPanelDPDCApi,
-    Gat_A: EEUpdPanelGatAApi,
+    'NonPlan(3054)': EEUpdPanelGatAApi,
     Gat_BCF: EEUpdPanelGatFBCApi,
     Gat_D: EEUpdPanelGatDApi,
     MLA: EEUpdPanelMLAApi,
@@ -192,7 +192,7 @@ const StatusScreen = ({navigation, navigator}) => {
     '2515': ContUpdPanel2515Api,
     Deposit: ContUpdPanelDeposite_fundApi,
     DPDC: ContUpdPanelDPDCApi,
-    Gat_A: ContUpdPanelGAT_AApi,
+    'NonPlan(3054)': ContUpdPanelGAT_AApi,
     Gat_BCF: ContUpdPanelGAT_FBCApi,
     Gat_D: ContUpdPanelGAT_DApi,
     MLA: ContUpdPanelMLAApi,
@@ -210,7 +210,7 @@ const StatusScreen = ({navigation, navigator}) => {
     '2515': set2515Data,
     Deposit: setDepositData,
     DPDC: setDPDCData,
-    Gat_A: setGatAData,
+    'NonPlan(3054)': setGatAData,
     Gat_BCF: setGatFBCData,
     Gat_D: setGatBData,
     MLA: setMLAData,
@@ -227,7 +227,7 @@ const StatusScreen = ({navigation, navigator}) => {
     Road: {api: CirclegetRoadApi, set: setCircleRoadData},
     Deposit: {api: CirclegetDepositFundApi, set: setCircleDepositFundData},
     DPDC: {api: CirclegetDPDCApi, set: setCircleDPDCData},
-    Gat_A: {api: CirclegetGATAApi, set: setCircleGATAData},
+    'NonPlan(3054)': {api: CirclegetGATAApi, set: setCircleGATAData},
     Gat_BCF: {api: CirclegetGATFBCApi, set: setCircleGATFBCData},
     Gat_D: {api: CirclegetGATDApi, set: setCircleGATDData},
     MLA: {api: CirclegetMLAApi, set: setCircleMLAData},
@@ -246,11 +246,6 @@ const StatusScreen = ({navigation, navigator}) => {
   useEffect(() => {
     const fetchUserDetails = async () => {
       try {
-        const storedUserId = await AsyncStorage.getItem('USER_ID');
-        if (storedUserId) {
-          setUserId(storedUserId);
-        }
-
         const storedRole = await AsyncStorage.getItem('userRole');
         if (storedRole) {
           setRole(storedRole);
@@ -272,6 +267,59 @@ const StatusScreen = ({navigation, navigator}) => {
     fetchUserDetails();
   }, []);
 
+  const fetchReportData = useCallback(async (roleParam, reportType, locationParam, userNameParam) => {
+    setLoading(true);
+    try {
+      let apiFn = null;
+      const payload = {office: locationParam};
+      if (roleParam === 'Executive Engineer') {
+        apiFn = EEApiMap[reportType];
+      } else if (
+        ['Contractor', 'Sectional Engineer', 'Deputy Engineer'].includes(roleParam)
+      ) {
+        apiFn = ContApiMap[reportType];
+        payload.name = userNameParam;
+      }
+      if (apiFn) {
+        const response = await apiFn(payload);
+        const setData = setDataMap[reportType];
+        if (response?.success && Array.isArray(response.data)) {
+          const groupedData = groupByWorkId(response.data);
+          setData(groupedData);
+        } else {
+          setData([]);
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching ${reportType} data:`, error);
+      setDataMap[reportType]([]);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchCircleData = useCallback(async (reportType, locationParam) => {
+    const entry = circleApiMap[reportType];
+    if (!entry) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const response = await entry.api({office: locationParam});
+      if (response?.success) {
+        entry.set(response.data);
+      } else {
+        console.warn(`Circle API failed for ${reportType}`);
+      }
+    } catch (error) {
+      console.error(`Error fetching Circle ${reportType} data:`, error);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (
       [
@@ -290,11 +338,11 @@ const StatusScreen = ({navigation, navigator}) => {
         'Annuity',
         'Nabard',
         'Road',
+        'NonPlan(3054)',
         '2216',
         '2059',
         'Deposit',
         'DPDC',
-        'Gat_A',
         'Gat_BCF',
         'Gat_D',
         'MLA',
@@ -309,11 +357,11 @@ const StatusScreen = ({navigation, navigator}) => {
         'Annuity',
         'Nabard',
         'Road',
+        'NonPlan(3054)',
         '2216',
         '2059',
         'Deposit',
         'DPDC',
-        'Gat_A',
         'Gat_BCF',
         'Gat_D',
         'MLA',
@@ -321,61 +369,16 @@ const StatusScreen = ({navigation, navigator}) => {
         '2515',
       ]);
     }
-  }, [selectedReportType, role]);
+  }, [selectedReportType, role, location, userName, fetchReportData, fetchCircleData]);
 
-  const fetchReportData = async (role, reportType, location, userName) => {
-    setLoading(true);
-    try {
-      let apiFn = null;
-      const payload = {office: location};
-      if (role === 'Executive Engineer') apiFn = EEApiMap[reportType];
-      else if (
-        ['Contractor', 'Sectional Engineer', 'Deputy Engineer'].includes(role)
-      ) {
-        apiFn = ContApiMap[reportType];
-        payload.name = userName;
-      }
-      if (apiFn) {
-        const response = await apiFn(payload);
-        const setData = setDataMap[reportType];
-        if (response?.success && Array.isArray(response.data)) {
-          const groupedData = groupByWorkId(response.data);
-          setData(groupedData);
-        } else {
-          setData([]);
-        }
-      }
-    } catch (error) {
-      console.error(`Error fetching ${reportType} data:`, error);
-      setDataMap[reportType]([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCircleData = async (reportType, location) => {
-    const entry = circleApiMap[reportType];
-    if (!entry) return;
-    try {
-      setLoading(true);
-      const response = await entry.api({office: location});
-      if (response?.success) {
-        entry.set(response.data);
-      } else {
-        console.warn(`Circle API failed for ${reportType}`);
-      }
-    } catch (error) {
-      console.error(`Error fetching Circle ${reportType} data:`, error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const groupByWorkId = data => {
     const grouped = {};
     data.forEach(item => {
       const workId = item['वर्क आयडी'] || item.WorkId;
-      if (!workId) return;
+      if (!workId) {
+        return;
+      }
       if (!grouped[workId]) {
         grouped[workId] = {...item, प्रतिमा: []};
       }
@@ -395,7 +398,9 @@ const StatusScreen = ({navigation, navigator}) => {
   };
 
   const bufferToBase64 = buffer => {
-    if (!buffer || !buffer.data) return null;
+    if (!buffer || !buffer.data) {
+      return null;
+    }
 
     const binary = buffer.data.reduce(
       (acc, byte) => acc + String.fromCharCode(byte),
@@ -405,19 +410,27 @@ const StatusScreen = ({navigation, navigator}) => {
   };
 
   const normalizeImages = image => {
-    if (!image) return [];
+    if (!image) {
+      return [];
+    }
 
     if (Array.isArray(image)) {
       return image
         .map(img => {
-          if (typeof img === 'string') return img;
-          if (img && img.data) return bufferToBase64(img);
+          if (typeof img === 'string') {
+            return img;
+          }
+          if (img && img.data) {
+            return bufferToBase64(img);
+          }
           return null;
         })
         .filter(Boolean);
     }
 
-    if (typeof image === 'string') return [image];
+    if (typeof image === 'string') {
+      return [image];
+    }
 
     if (image && image.data) {
       const base64 = bufferToBase64(image);
@@ -492,31 +505,57 @@ const StatusScreen = ({navigation, navigator}) => {
     const options = {
       mediaType: 'photo',
       includeBase64: true,
+      quality: 0.8,
+      saveToPhotos: false,
     };
-  
+
     const callback = async response => {
-      console.log('📸 Response:', response);
-  
+      console.log('📸 Response:', JSON.stringify(response, null, 2));
+
       if (response.didCancel) {
         console.log('User cancelled image picker');
         return;
       }
-  
+
       if (response.errorCode) {
-        console.log('ImagePicker Error:', response.errorMessage);
-        Toaster('Error selecting image.');
+        console.error('ImagePicker Error Code:', response.errorCode);
+        console.error('ImagePicker Error Message:', response.errorMessage);
+
+        // Show more detailed error message to user
+        let errorMsg = 'Error selecting image.';
+        if (response.errorCode === 'camera_unavailable') {
+          errorMsg = 'Camera is not available. Please use a physical device or check camera permissions.';
+        } else if (response.errorCode === 'permission') {
+          errorMsg = 'Camera permission denied. Please enable it in Settings.';
+        } else if (response.errorMessage) {
+          errorMsg = `Error: ${response.errorMessage}`;
+        }
+
+        Toaster(errorMsg);
+
+        // If permission error, show alert to open settings
+        if (response.errorCode === 'permission' && Platform.OS === 'ios') {
+          Alert.alert(
+            'Camera Permission',
+            'Camera access is required. Please enable it in Settings.',
+            [
+              {text: 'Cancel', style: 'cancel'},
+              {text: 'Open Settings', onPress: () => openSettings()},
+            ],
+          );
+        }
         return;
       }
-  
+
       try {
         setUploading(true);
-  
+
         const image = response.assets[0];
-        const { latitude, longitude } = await getCurrentLocation();
+        const {latitude, longitude} = await getCurrentLocation();
         const rawFileName = image.fileName || `image_${Date.now()}.jpg`;
         const shortFileName =
           rawFileName.length > 50 ? rawFileName.slice(-50) : rawFileName;
-  
+
         const requestBody = {
           office: location,
           WorkId: item['वर्क आयडी'],
@@ -528,7 +567,7 @@ const StatusScreen = ({navigation, navigator}) => {
           Type: selectedReportType,
           Description: item['शेरा'],
         };
-  
+
         const result = await ConUploadImageApi(requestBody);
 
         if (result?.success) {
@@ -546,23 +585,23 @@ const StatusScreen = ({navigation, navigator}) => {
             ImageUrl: uploadedImage,
             imageUrl: uploadedImage,
           };
-  
+
           const updateMap = {
-            Building: { data: statusreportbuildingData, set: setBuildingData },
-            CRF: { data: statusreportCrfData, set: setCrfData },
-            Annuity: { data: statusreportAnnuityData, set: setAnnuityData },
-            Nabard: { data: statusreportNabardData, set: setNabardData },
-            Road: { data: statusreportRoaddata, set: setRoadData },
+            Building: {data: statusreportbuildingData, set: setBuildingData},
+            CRF: {data: statusreportCrfData, set: setCrfData},
+            Annuity: {data: statusreportAnnuityData, set: setAnnuityData},
+            Nabard: {data: statusreportNabardData, set: setNabardData},
+            Road: {data: statusreportRoaddata, set: setRoadData},
           };
-  
-          const { data, set } = updateMap[selectedReportType] || {};
+
+          const {data, set} = updateMap[selectedReportType] || {};
           if (data && set) {
             const updatedData = data.map(d =>
-              (d['वर्क आयडी'] || d.WorkId) === item['वर्क आयडी'] ? updatedItem : d
+              (d['वर्क आयडी'] || d.WorkId) === item['वर्क आयडी'] ? updatedItem : d,
             );
             set(updatedData);
           }
-  
+
           // ✅ Fetch latest report data from API again
           if (
             [
@@ -574,7 +613,7 @@ const StatusScreen = ({navigation, navigator}) => {
           ) {
             fetchReportData(role, selectedReportType, location, userName);
           }
-  
+
           if (role === 'Supreintending Engiener') {
             setSections([
               'Building',
@@ -586,7 +625,7 @@ const StatusScreen = ({navigation, navigator}) => {
               '2059',
               'Deposit',
               'DPDC',
-              'Gat_A',
+              'NonPlan(3054)',
               'Gat_BCF',
               'Gat_D',
               'MLA',
@@ -595,7 +634,8 @@ const StatusScreen = ({navigation, navigator}) => {
             ]);
             fetchCircleData(selectedReportType, location);
           } else {
-            setSections(['Building',
+            setSections([
+              'Building',
               'CRF',
               'Annuity',
               'Nabard',
@@ -604,12 +644,13 @@ const StatusScreen = ({navigation, navigator}) => {
               '2059',
               'Deposit',
               'DPDC',
-              'Gat_A',
+              'NonPlan(3054)',
               'Gat_BCF',
               'Gat_D',
               'MLA',
               'MP2',
-              '2515',]);
+              '2515',
+            ]);
           }
         } else {
           Toaster('Photo not uploaded successfully...');
@@ -621,13 +662,13 @@ const StatusScreen = ({navigation, navigator}) => {
         setUploading(false);
       }
     };
-  
+
     // Launch Camera or Gallery
     try {
       if (source === 'camera') {
         if (Platform.OS === 'android') {
           const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.CAMERA
+            PermissionsAndroid.PERMISSIONS.CAMERA,
           );
           if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
             Toaster('Camera permission denied.');
@@ -635,34 +676,37 @@ const StatusScreen = ({navigation, navigator}) => {
           }
         } else if (Platform.OS === 'ios') {
           try {
+            // First check the current permission status
             const currentStatus = await check(PERMISSIONS.IOS.CAMERA);
             console.log('Camera permission status:', currentStatus);
-            
-            if (currentStatus === RESULTS.BLOCKED || currentStatus === RESULTS.DENIED) {
+
+            // If permission is blocked, show alert to open settings
+            if (currentStatus === RESULTS.BLOCKED) {
               Alert.alert(
                 'Camera Permission',
-                'Camera access is required to take photos. Please enable it in Settings.',
+                'Camera access is blocked. Please enable it in Settings.',
                 [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Open Settings', onPress: () => openSettings() },
-                ]
+                  {text: 'Cancel', style: 'cancel'},
+                  {text: 'Open Settings', onPress: () => openSettings()},
+                ],
               );
               return;
             }
-            
+
+            // If permission is not granted, request it
             if (currentStatus !== RESULTS.GRANTED) {
               const granted = await request(PERMISSIONS.IOS.CAMERA);
               console.log('Camera permission request result:', granted);
-              
+
               if (granted !== RESULTS.GRANTED) {
                 if (granted === RESULTS.BLOCKED) {
                   Alert.alert(
                     'Camera Permission',
                     'Camera access is blocked. Please enable it in Settings.',
                     [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Open Settings', onPress: () => openSettings() },
-                    ]
+                      {text: 'Cancel', style: 'cancel'},
+                      {text: 'Open Settings', onPress: () => openSettings()},
+                    ],
                   );
                 } else {
                   Toaster('Camera permission denied.');
@@ -670,20 +714,40 @@ const StatusScreen = ({navigation, navigator}) => {
                 return;
               }
             }
+
+            // Permission is granted, proceed to launch camera
+            console.log('Camera permission granted, launching camera...');
           } catch (permError) {
             console.error('Permission check/request error:', permError);
-            // Fallback: try to launch camera anyway (react-native-image-picker might handle it)
-            console.log('Attempting to launch camera despite permission error...');
+            // Even if there's an error, try to launch camera
+            // react-native-image-picker might handle the permission request itself
+            console.log('Attempting to launch camera (react-native-image-picker may handle permissions)...');
           }
         }
+        // Launch camera - react-native-image-picker will also check permissions
+        console.log('Launching camera with options:', options);
         launchCamera(options, callback);
       } else {
+        // For gallery, react-native-image-picker handles permissions automatically
+        console.log('Launching image library with options:', options);
         launchImageLibrary(options, callback);
       }
     } catch (err) {
       console.error('Image Picker error:', err.message);
       console.error('Full error:', err);
-      Toaster('Failed to launch image picker: ' + (err.message || 'Unknown error'));
+      console.error('Error stack:', err.stack);
+
+      let errorMsg = 'Failed to launch image picker.';
+      if (err.message) {
+        errorMsg += ` ${err.message}`;
+      }
+
+      // Note: Camera doesn't work on iOS Simulator - must test on physical device
+      if (Platform.OS === 'ios' && source === 'camera') {
+        errorMsg += ' (Note: Camera requires a physical device, not simulator)';
+      }
+
+      Toaster(errorMsg);
     }
   };
 
@@ -788,7 +852,7 @@ const StatusScreen = ({navigation, navigator}) => {
         setDataFunction = setUpdateDPDCData;
         setLocalDataFunction = setDPDCData;
         break;
-      case 'Gat_A':
+      case 'NonPlan(3054)':
         apiFunction = UpdateStatusGatAApi;
         setDataFunction = setUpdateGatAData;
         setLocalDataFunction = setGatAData;
@@ -899,7 +963,6 @@ const StatusScreen = ({navigation, navigator}) => {
       item.imageUrl ||
       item.Image ||
       null;
-    const contentType = item['ContentType'] || item.ContentType || '';
     const normalizedImages = normalizeImages(image);
 
     return (
@@ -969,7 +1032,9 @@ const StatusScreen = ({navigation, navigator}) => {
               </TouchableOpacity>   */}
               <TouchableOpacity
                 onPress={() => {
-                  if (!normalizedImages.length) return;
+                  if (!normalizedImages.length) {
+                    return;
+                  }
 
                   setSelectedImages(normalizedImages);
                   setSelectedItem(workId);
@@ -1141,7 +1206,7 @@ const StatusScreen = ({navigation, navigator}) => {
                       ? circleDPDCData
                       : selectedReportType === 'DPDC'
                       ? circleDPDCData
-                      : selectedReportType === 'Gat_A'
+                      : selectedReportType === 'NonPlan(3054)'
                       ? circleGATAData
                       : selectedReportType === 'Gat_BCF'
                       ? circleGATFBCData
@@ -1184,7 +1249,7 @@ const StatusScreen = ({navigation, navigator}) => {
                       ? statusreportDepositData
                       : selectedReportType === 'DPDC'
                       ? statusreportDPDCData
-                      : selectedReportType === 'Gat_A'
+                      : selectedReportType === 'NonPlan(3054)'
                       ? statusreportGatAData
                       : selectedReportType === 'Gat_BCF'
                       ? statusreportGatFBCData
@@ -1217,7 +1282,7 @@ const StatusScreen = ({navigation, navigator}) => {
                       ? statusupdateDepositData
                       : selectedReportType === 'DPDC'
                       ? statusupdateDPDCData
-                      : selectedReportType === 'Gat_A'
+                      : selectedReportType === 'NonPlan(3054)'
                       ? statusupdateGatAData
                       : selectedReportType === 'Gat_BCF'
                       ? statusupdateGatFBCData

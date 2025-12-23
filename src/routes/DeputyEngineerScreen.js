@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   View,
   StyleSheet,
@@ -21,7 +21,7 @@ import {BarChart} from 'react-native-gifted-charts';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import {HomeAllimageapi, RollwiseImageApi} from '../Api/AllImageApi';
 import ImageViewing from 'react-native-image-viewing';
-import {contractorCountApi} from '../Api/ContractordashBoardApi';
+import { DeputyCountApi} from '../Api/ContractordashBoardApi';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -46,20 +46,23 @@ const DeputyEngineerScreen = ({navigation, route}) => {
       img.ImageUrl ||
       (img.Image ? `data:image/jpeg;base64,${img.Image}` : ''),
   }));
-  const barColors = [
-    '#4CAF50',
-    '#2196F3',
-    '#FFC107',
-    '#FF5722',
-    '#9C27B0',
-    '#009688',
-    '#3F51B5',
-    '#E91E63',
-    '#00BCD4',
-    '#CDDC39',
-    '#673AB7',
-    '#FF9800',
-  ];
+  const barColors = useMemo(
+    () => [
+      '#4CAF50',
+      '#2196F3',
+      '#FFC107',
+      '#FF5722',
+      '#9C27B0',
+      '#009688',
+      '#3F51B5',
+      '#E91E63',
+      '#00BCD4',
+      '#CDDC39',
+      '#673AB7',
+      '#FF9800',
+    ],
+    [],
+  );
 
   const COLUMN_WIDTHS = {
     status: 100,
@@ -79,10 +82,10 @@ const DeputyEngineerScreen = ({navigation, route}) => {
     {title: 'Annuity'},
     {title: 'Nabard'},
     {title: 'SH & DOR'},
+    {title: 'NonPlan(3054)'},
     {title: '2515'},
     {title: 'Deposit'},
     {title: 'DPDC'},
-    {title: 'Gat_A'},
     {title: 'Gat_D'},
     {title: 'Gat_B|C|F'},
     {title: 'MLA'},
@@ -181,6 +184,12 @@ const DeputyEngineerScreen = ({navigation, route}) => {
     },
   ];
 
+  // small helper to avoid calling APIs with invalid office ids
+  const hasValidLocation = useCallback(
+    () => location && location !== 'null' && location !== 'undefined',
+    [location],
+  );
+
   useEffect(() => {
     const fetchUserDetails = async () => {
       try {
@@ -208,18 +217,86 @@ const DeputyEngineerScreen = ({navigation, route}) => {
       }
     };
     fetchUserDetails();
-    // HomeAllimage();
-    RollWiseImg();
-    fetchGraphData();
   }, []);
 
-  const fetchGraphData = async () => {
-    try {
-      const data = await contractorCountApi({
-        office: location,
-        position: role,
-        name: userName,
+  useEffect(() => {
+    // Wait until a valid location is available to avoid sending empty payloads
+    if (!hasValidLocation()) {
+      console.warn('Location not set yet, skipping API calls');
+      return;
+    }
+    HomeAllimage();
+    RollWiseImg();
+    fetchGraphData();
+  }, [
+    location,
+    role,
+    userName,
+    hasValidLocation,
+    HomeAllimage,
+    RollWiseImg,
+    fetchGraphData,
+  ]);
+
+  const transformGraphData = useCallback(
+    rawData => {
+      if (!Array.isArray(rawData) || rawData.length === 0) {
+        return [];
+      }
+
+      const firstItem = rawData[0];
+      const barDataArray = [];
+
+      // Desired fixed order of bars
+      const orderedKeys = [
+        'Building',
+        'CRF',
+        'Nabard',
+        'Road',
+        'NonPlan',
+        'Annuity',
+        'Deposit',
+        'DPDC',
+        'Gat_D',
+        'Gat_BCF',
+        'MLA',
+        'MP',
+        'NRB2059',
+        'RB2216',
+        'GramVikas',
+      ];
+
+      // Map API field names to display labels
+      const labelDisplayMap = {
+        Gat_A: 'NonPlan',
+      };
+
+      orderedKeys.forEach((key, index) => {
+        const value = firstItem[key];
+        barDataArray.push({
+          label: labelDisplayMap[key] || key,
+          value: value === null || value === undefined ? 0 : Number(value),
+          frontColor: barColors[index % barColors.length],
+        });
       });
+
+      return barDataArray;
+    },
+    [barColors],
+  );
+
+  const fetchGraphData = useCallback(
+    async () => {
+      if (!hasValidLocation()) {
+        console.warn('fetchGraphData called with invalid location — skipping');
+        return;
+      }
+      try {
+        const data = await DeputyCountApi({
+          office: location,
+          position: role,
+          name: userName,
+        });
       if (data?.success === true || data?.success === 'true') {
         if (Array.isArray(data.data)) {
           const barDataTransformed = transformGraphData(data.data);
@@ -231,33 +308,18 @@ const DeputyEngineerScreen = ({navigation, route}) => {
         setBarData([]);
         console.warn('API did not return success:', data?.success);
       }
-    } catch (error) {
-      console.error('Error fetching graph data:', error);
-      setBarData([]);
-    }
-  };
+      } catch (error) {
+        console.error('Error fetching graph data:', error);
+        setBarData([]);
+      }
+    },
+    [location, role, userName, hasValidLocation, transformGraphData],
+  );
+  console.log(barData, 'barData');
 
-  const transformGraphData = rawData => {
-    if (!Array.isArray(rawData) || rawData.length === 0) return [];
-
-    const firstItem = rawData[0];
-    const barDataArray = [];
-
-    let index = 0;
-    for (const [key, value] of Object.entries(firstItem)) {
-      barDataArray.push({
-        label: key,
-        value: value === null || value === undefined ? 0 : Number(value),
-        frontColor: barColors[index % barColors.length],
-      });
-      index++;
-    }
-    return barDataArray;
-  };
-
-  const RollWiseImg = async () => {
-    if (!location) {
-      console.warn('RollWiseImg called with null location — skipping');
+  const RollWiseImg = useCallback(async () => {
+    if (!hasValidLocation()) {
+      console.warn('RollWiseImg called with invalid location — skipping');
       return;
     }
     setLoadingImages(true);
@@ -280,9 +342,13 @@ const DeputyEngineerScreen = ({navigation, route}) => {
     } finally {
       setLoadingImages(false);
     }
-  };
+  }, [hasValidLocation, location, userName]);
 
-  const HomeAllimage = async () => {
+  const HomeAllimage = useCallback(async () => {
+    if (!hasValidLocation()) {
+      console.warn('HomeAllimage called with invalid location — skipping');
+      return;
+    }
     try {
       const response = await HomeAllimageapi({
         office: location,
@@ -299,7 +365,7 @@ const DeputyEngineerScreen = ({navigation, route}) => {
       console.error('Error fetching EEUpdPanelBuilding status data:', error);
       setImageData([]);
     }
-  };
+  }, [hasValidLocation, location]);
 
   const renderItem = ({item, index}) => (
     <TouchableOpacity
@@ -367,14 +433,16 @@ const DeputyEngineerScreen = ({navigation, route}) => {
                 Smart Budget Head Wise Count
               </Text>
               <BarChart
-                barWidth={25}
-                spacing={30}
-                noOfSections={5}
-                barBorderRadius={6}
                 data={barData}
+                barWidth={26}
+                spacing={24}
+                barBorderRadius={6}
+                noOfSections={5}
+                height={220}
+                maxValue={Math.max(...barData.map(b => b.value || 0), 1)}
+                frontColor="#4CAF50"
                 isAnimated
                 animationDuration={1200}
-                showGradient
                 yAxisTextStyle={{color: 'black'}}
                 xAxisLabelTextStyle={{
                   color: 'black',
@@ -387,81 +455,6 @@ const DeputyEngineerScreen = ({navigation, route}) => {
               />
             </View>
 
-            {/* <View style={styles.buttonRow}>
-              {['Building', 'Road', 'NABARD', 'All'].map(category => (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.filterButton,
-                    selectedCategory === category &&
-                      styles.selectedFilterButton,
-                  ]}
-                  onPress={() => setSelectedCategory(category)}>
-                  <Text
-                    style={[
-                      styles.filterButtonText,
-                      selectedCategory === category &&
-                        styles.selectedFilterButtonText,
-                    ]}>
-                    {category}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View> */}
-
-            {/* <View style={styles.tableContainer}>
-              <View style={styles.tableHeader}>
-                <Text style={styles.tableHeaderText}>Project</Text>
-                <Text style={styles.tableHeaderText}>Status</Text>
-              </View>
-              {filteredReports.map((item, index) => (
-                <View key={index} style={styles.tableRow}>
-                  <Text style={styles.tableCell}>{item.project}</Text>
-                  <Text style={styles.tableCell}>{item.status}</Text>
-                </View>
-              ))}
-            </View> */}
-
-            {/* <View style={styles.buttonRow}>
-              {['Building', 'Road', 'NABARD', 'All'].map(category => (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.filterButton,
-                    selectedNutritionCategory === category &&
-                      styles.selectedFilterButton,
-                  ]}
-                  onPress={() => setSelectedNutritionCategory(category)}>
-                  <Text
-                    style={[
-                      styles.filterButtonText,
-                      selectedNutritionCategory === category &&
-                        styles.selectedFilterButtonText,
-                    ]}>
-                    {category}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View> */}
-
-            {/* <View style={styles.nutritionContainer}>
-              {nutritionData.map((item, index) => (
-                <View key={index} style={styles.nutritionRow}>
-                  <Text style={styles.nutritionLabel} numberOfLines={1}>
-                    {item.label}
-                  </Text>
-                  <View style={styles.progressBarBackground}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        {width: `${(item.value / item.max) * 100}%`},
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.nutritionValue}>{item.value}</Text>
-                </View>
-              ))}
-            </View> */}
 
             <View style={styles.headWiseContainer}>
               <Text style={styles.headWiseTitle}>

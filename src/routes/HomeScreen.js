@@ -1,4 +1,6 @@
-import React, {useEffect, useState} from 'react';
+/* eslint-disable react-native/no-inline-styles */
+/* eslint-disable dot-notation */
+import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
   StyleSheet,
@@ -48,11 +50,11 @@ const HomeScreen = ({navigation}) => {
   const [animatedGraphData, setAnimatedGraphData] = useState([]);
   const [stackedBarChartData, setStackedBarChartData] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [userId, setUserId] = useState(null);
+  const [, setUserId] = useState(null);
   const [userName, setUserName] = useState(null);
   const [location, setLocation] = useState(null);
   const [role, setRole] = useState(null);
-  const [selectedHeadWiseData, setSelectedHeadWiseData] = useState([]);
+  const [, setSelectedHeadWiseData] = useState([]);
   const [expandedHead, setExpandedHead] = useState(null);
   const [headWiseDataResult, setHeadWiseDataResult] = useState([]);
   const [headWiseMessage, setHeadWiseMessage] = useState('');
@@ -83,10 +85,10 @@ const HomeScreen = ({navigation}) => {
     {title: 'Annuity'},
     {title: 'Nabard'},
     {title: 'SH & DOR'},
+    {title: 'NonPlan'},
     {title: '2515'},
     {title: 'Deposit'},
     {title: 'DPDC'},
-    {title: 'Gat_A'},
     {title: 'Gat_D'},
     {title: 'Gat_B|C|F'},
     {title: 'MLA'},
@@ -134,7 +136,9 @@ const HomeScreen = ({navigation}) => {
         }
 
         const storedLocation = await AsyncStorage.getItem('LOCATION_ID');
-        if (storedLocation) setLocation(storedLocation);
+        if (storedLocation) {
+          setLocation(storedLocation);
+        }
       } catch (error) {
         console.error('Error fetching user details:', error);
       }
@@ -143,31 +147,28 @@ const HomeScreen = ({navigation}) => {
   }, []);
 
   useEffect(() => {
-    if (!location) {
+    if (!graphData || graphData.length === 0) {
       return;
     }
-    fetchGraphData();
-    fetchperSubDivCountData();
-    homeAllImage();
-  }, [location]);
-
-  useEffect(() => {
-    if (!graphData || graphData.length === 0) return;
     let startTime;
     const duration = 2000;
     const animateBars = timestamp => {
-      if (!startTime) startTime = timestamp;
+      if (!startTime) {
+        startTime = timestamp;
+      }
       const progress = Math.min((timestamp - startTime) / duration, 1);
       setAnimatedGraphData(
         graphData.map(item => Math.floor(item.count * progress)),
       );
 
-      if (progress < 1) requestAnimationFrame(animateBars);
+      if (progress < 1) {
+        requestAnimationFrame(animateBars);
+      }
     };
     requestAnimationFrame(animateBars);
   }, [graphData]);
 
-  const homeAllImage = async () => {
+  const homeAllImage = useCallback(async () => {
     setLoadingImages(true);
     try {
       const response = await HomeAllimageapi({office: location});
@@ -185,9 +186,9 @@ const HomeScreen = ({navigation}) => {
     } finally {
       setLoadingImages(false);
     }
-  };
+  }, [location]);
 
-  const fetchGraphData = async () => {
+  const fetchGraphData = useCallback(async () => {
     try {
       const data = await countApi({office: location});
       if (data?.success === true || data?.success === 'true') {
@@ -204,20 +205,37 @@ const HomeScreen = ({navigation}) => {
       console.error('Error fetching graph data:', error);
       setGraphData([]);
     }
-  };
+  }, [location]);
 
-  const fetchperSubDivCountData = async () => {
+  const fetchperSubDivCountData = useCallback(async () => {
     try {
       const data = await perSubDivCountApi({office: location});
 
       if (data?.success === true && Array.isArray(data.data)) {
         const labels = data.data.map(item => item.Upvibhag).slice(0, 6);
         const values = data.data.map(item => [item.count]).slice(0, 6);
+        const colors = [
+          '#4682B4',
+          '#6B5B95',
+          '#88B04B',
+          '#FFA07A',
+          '#20B2AA',
+          '#FFB347',
+          '#DC143C',
+          '#00CED1',
+          '#FF3366',
+          '#FF8C00',
+          '#20B2AA',
+          '#FFD700',
+          '#FF4500',
+          '#32CD32',
+          '#4682B4',
+        ];
         setStackedBarChartData({
           labels,
           legend: ['Count'],
           data: values,
-          barColors: labels.map((_, i) => randomColor(i)),
+          barColors: labels.map((_, i) => colors[i % colors.length]),
         });
       } else {
         setStackedBarChartData(null);
@@ -226,7 +244,16 @@ const HomeScreen = ({navigation}) => {
       console.error('Error fetching sub-division data:', error);
       setStackedBarChartData(null);
     }
-  };
+  }, [location]);
+
+  useEffect(() => {
+    if (!location) {
+      return;
+    }
+    fetchGraphData();
+    fetchperSubDivCountData();
+    homeAllImage();
+  }, [location, fetchGraphData, fetchperSubDivCountData, homeAllImage]);
 
   const fetchBudgetMaster2515 = async () => {
     try {
@@ -504,7 +531,7 @@ const HomeScreen = ({navigation}) => {
       result = await fetchBudgetMasterGAT_FBC();
     } else if (title === 'Gat_D') {
       result = await fetchBudgetMasterGAT_D();
-    } else if (title === 'Gat_A') {
+    } else if (title === 'NonPlan') {
       result = await fetchBudgetMasterGAT_A();
     } else if (title === 'DPDC') {
       result = await fetchBudgetMasterDPDC();
@@ -757,8 +784,8 @@ const HomeScreen = ({navigation}) => {
                             </Text>
                           </View>
 
-                          {totalHeadAbstractData?.map((row, index) => (
-                            <View key={index} style={styles.tableRow}>
+                          {totalHeadAbstractData?.map((row, rowIndex) => (
+                            <View key={rowIndex} style={styles.tableRow}>
                               <Text style={[styles.tableCell, {width: 120}]}>
                                 {row['Head Name']}
                               </Text>

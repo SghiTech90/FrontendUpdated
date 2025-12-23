@@ -65,10 +65,10 @@ const MLAScreen = ({navigation, route}) => {
     {title: 'Annuity'},
     {title: 'Nabard'},
     {title: 'SH & DOR'},
+    {title: 'NonPlan(3054)'},
     {title: '2515'},
     {title: 'Deposit'},
     {title: 'DPDC'},
-    {title: 'Gat_A'},
     {title: 'Gat_D'},
     {title: 'Gat_B|C|F'},
     {title: 'MLA'},
@@ -366,83 +366,6 @@ const MLAScreen = ({navigation, route}) => {
               />
             </View>
 
-            <View style={styles.buttonRow}>
-              {['Building', 'Road', 'NABARD', 'All'].map(category => (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.filterButton,
-                    selectedCategory === category &&
-                      styles.selectedFilterButton,
-                  ]}
-                  onPress={() => setSelectedCategory(category)}>
-                  <Text
-                    style={[
-                      styles.filterButtonText,
-                      selectedCategory === category &&
-                        styles.selectedFilterButtonText,
-                    ]}>
-                    {category}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.tableContainer}>
-              <View style={styles.tableHeader}>
-                <Text style={styles.tableHeaderText}>Project</Text>
-                <Text style={[styles.tableHeaderText, {left: '35%'}]}>
-                  Status
-                </Text>
-              </View>
-              {filteredReports.map((item, index) => (
-                <View key={index} style={styles.tableRow}>
-                  <Text style={styles.tableCellProject}>{item.project}</Text>
-                  <Text style={styles.tableCellStatus}>{item.status}</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.buttonRow}>
-              {['Building', 'Road', 'NABARD', 'All'].map(category => (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.filterButton,
-                    selectedNutritionCategory === category &&
-                      styles.selectedFilterButton,
-                  ]}
-                  onPress={() => setSelectedNutritionCategory(category)}>
-                  <Text
-                    style={[
-                      styles.filterButtonText,
-                      selectedNutritionCategory === category &&
-                        styles.selectedFilterButtonText,
-                    ]}>
-                    {category}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.nutritionContainer}>
-              {nutritionData.map((item, index) => (
-                <View key={index} style={styles.nutritionRow}>
-                  <Text style={styles.nutritionLabel} numberOfLines={1}>
-                    {item.label}
-                  </Text>
-                  <View style={styles.progressBarBackground}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        {width: `${(item.value / item.max) * 100}%`},
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.nutritionValue}>{item.value}</Text>
-                </View>
-              ))}
-            </View>
 
             <View style={styles.headWiseContainer}>
               <Text style={styles.headWiseTitle}>

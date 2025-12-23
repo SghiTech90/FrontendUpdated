@@ -1,3 +1,6 @@
+/* eslint-disable react-native/no-inline-styles */
+/* eslint-disable dot-notation */
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, {useEffect, useState} from 'react';
 import {
   View,
@@ -78,7 +81,7 @@ const ReportScreen = ({navigation, route}) => {
     '2515': report2515Data,
     Deposit: reportDepositData,
     DPDC: reportDPDCData,
-    Gat_A: reportGatAData,
+    'NonPlan(3054)': reportGatAData,
     Gat_D: reportGatDData,
     Gat_BCF: reportGatFBCData,
     MLA: reportMLAData,
@@ -99,7 +102,9 @@ const ReportScreen = ({navigation, route}) => {
   };
 
   const renderPagination = () => {
-    if (totalPages <= 1) return null;
+    if (totalPages <= 1) {
+      return null;
+    }
     const startPage = pageGroup * pagesPerGroup + 1;
     const endPage = Math.min(startPage + pagesPerGroup - 1, totalPages);
     const pageNumbers = [];
@@ -140,12 +145,10 @@ const ReportScreen = ({navigation, route}) => {
   };
 
   useEffect(() => {
-    const data = sectionDataMap[selectedSection] || [];
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
-    const currentPageData = data.slice(start, end);
-    setPaginatedData(currentPageData);
-  }, [page, selectedSection, sectionDataMap[selectedSection]]);
+    setPaginatedData(currentSectionData.slice(start, end));
+  }, [page, selectedSection, currentSectionData]);
 
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -209,11 +212,11 @@ const ReportScreen = ({navigation, route}) => {
           'Annuity',
           'Nabard',
           'Road',
+          'NonPlan(3054)',
           '2216',
           '2059',
           'Deposit',
           'DPDC',
-          'Gat_A',
           'Gat_BCF',
           'Gat_D',
           'MLA',
@@ -228,11 +231,11 @@ const ReportScreen = ({navigation, route}) => {
           'Annuity',
           'Nabard',
           'Road',
+          'NonPlan(3054)',
           '2216',
           '2059',
           'Deposit',
           'DPDC',
-          'Gat_A',
           'Gat_BCF',
           'Gat_D',
           'MLA',
@@ -240,16 +243,23 @@ const ReportScreen = ({navigation, route}) => {
           '2515',
         ]);
       } else {
-        setSections(['Building', 'CRF', 'Annuity', 'Nabard', 'Road', '2216',
+        setSections([
+          'Building',
+          'CRF',
+          'Annuity',
+          'Nabard',
+          'Road',
+          'NonPlan(3054)',
+          '2216',
           '2059',
           'Deposit',
           'DPDC',
-          'Gat_A',
           'Gat_BCF',
           'Gat_D',
           'MLA',
           'MP',
-          '2515',]);
+          '2515',
+        ]);
       }
       setLoading(false);
     };
@@ -315,7 +325,7 @@ const ReportScreen = ({navigation, route}) => {
       });
       if (response?.success) {
         setReportNabardData(response.data);
-        console.log('response?.success',response.data)
+        console.log('response?.success', response.data);
       } else {
         console.warn('API did not return success:', response?.success);
         return {success: false, data: []};
@@ -1664,7 +1674,7 @@ const ReportScreen = ({navigation, route}) => {
         </Text>
         <Text style={[styles.cell, styles.headerCell, {width: 150}]}>MLA</Text>
         <Text style={[styles.cell, styles.headerCell, {width: 150}]}>MP</Text>
-        <Text style={[styles.cell, styles.headerCell, , {width: 150}]}>
+        <Text style={[styles.cell, styles.headerCell, {width: 150}]}>
           Contractor
         </Text>
         <Text style={[styles.cell, styles.headerCell, {width: 200}]}>
@@ -1715,10 +1725,10 @@ const ReportScreen = ({navigation, route}) => {
         <Text style={[styles.cell, styles.headerCell, {width: 150}]}>
           एकुण कामावरील खर्च
         </Text>
-        <Text style={[styles.cell, styles.headerCell, , {width: 150}]}>
+        <Text style={[styles.cell, styles.headerCell, {width: 150}]}>
           Current Cost
         </Text>
-        <Text style={[styles.cell, styles.headerCell, , {width: 150}]}>
+        <Text style={[styles.cell, styles.headerCell, {width: 150}]}>
           Previous Cost
         </Text>
         <Text style={[styles.cell, styles.headerCell, {width: 100}]}>
@@ -1870,20 +1880,20 @@ const ReportScreen = ({navigation, route}) => {
         <Text style={[styles.cell, {width: 150}]}>
           {item['Work Completion Date']}
         </Text>
-        <Text style={[styles.cell, , {width: 150}]}>
+        <Text style={[styles.cell, {width: 150}]}>
           {item['Extension Month']}
         </Text>
         <Text style={[styles.cell, {width: 150}]}>
           {item['Estimated Cost Approved']}
         </Text>
-        <Text style={[styles.cell, , {width: 150}]}>
+        <Text style={[styles.cell, {width: 150}]}>
           {item['Expenditure up to MAR 2026']}
         </Text>
-        <Text style={[styles.cell, , {width: 150}]}>
+        <Text style={[styles.cell, {width: 150}]}>
           {item['Remaining Cost']}
         </Text>
         <Text style={[styles.cell, {width: 150}]}>{item['Current Cost']}</Text>
-        <Text style={[styles.cell, , {width: 150}]}>
+        <Text style={[styles.cell, {width: 150}]}>
           {item['Previous Cost']}
         </Text>
         <Text style={[styles.cell, {width: 100}]}>
@@ -2416,7 +2426,7 @@ const ReportScreen = ({navigation, route}) => {
                 '2515',
                 'Deposit',
                 'DPDC',
-                'Gat_A',
+                'NonPlan(3054)',
                 'Gat_BCF',
                 'Gat_D',
                 'MLA',
@@ -2629,8 +2639,8 @@ const styles = StyleSheet.create({
   noDataText: {
     fontSize: 16,
     color: 'black',
-    top:100,
-    left:170   
+    top: 100,
+    left: 170,
   },
   sectionTitle: {
     fontSize: 18,

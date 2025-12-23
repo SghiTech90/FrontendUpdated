@@ -219,6 +219,15 @@ export async function CircleNotificationBtnMonthApi(credentials) {
 }
 
 export async function CircleTotaNotificationCountApi(credentials) {
+  if (
+    !credentials ||
+    !credentials.office ||
+    credentials.office === 'null' ||
+    credentials.office === 'undefined'
+  ) {
+    console.warn('CircleTotaNotificationCountApi called without a valid office');
+    return null;
+  }
   try {
     const response = await fetch(baseURL + 'budget/CircleTotalNotificationCount', {
       method: 'POST',
